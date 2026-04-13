@@ -1,0 +1,128 @@
+
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AIoT智慧城市中控面板（同学D）</title>
+    <style>
+        * {margin: 0; padding: 0; box-sizing: border-box; font-family: "Microsoft YaHei", sans-serif;}
+        body {background-color: #f5f7fa; padding: 20px;}
+        .container {max-width: 1000px; margin: 0 auto; background: #fff; padding: 25px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);}
+        .title {text-align: center; color: #2c3e50; margin-bottom: 30px; font-size: 24px;}
+        .status-box {border: 1px solid #e1e4e8; border-radius: 8px; padding: 20px; margin-bottom: 20px;}
+        .status-box h3 {color: #34495e; margin-bottom: 15px; font-size: 18px;}
+        .status-item {margin: 10px 0; font-size: 16px;}
+        .status-normal {color: #27ae60; font-weight: bold;}
+        .status-warning {color: #e74c3c; font-weight: bold;}
+        .control-box {border: 1px solid #e1e4e8; border-radius: 8px; padding: 20px; margin-bottom: 20px;}
+        .control-box h3 {color: #34495e; margin-bottom: 15px; font-size: 18px;}
+        .control-group {margin: 15px 0;}
+        .control-group h4 {color: #34495e; margin-bottom: 10px; font-size: 16px;}
+        .btn {padding: 8px 16px; margin-right: 10px; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; color: #fff;}
+        .btn-blue {background-color: #3498db;}
+        .btn-red {background-color: #e74c3c;}
+        .btn-green {background-color: #27ae60;}
+        .log-box {border: 1px solid #e1e4e8; border-radius: 8px; padding: 20px; background-color: #fafbfc; max-height: 220px; overflow-y: auto;}
+        .log-box h3 {color: #34495e; margin-bottom: 15px; font-size: 18px;}
+        .log-item {font-size: 14px; color: #7f8c8d; margin: 5px 0; line-height: 1.4;}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="title">AIoT智慧城市中控面板（同学D）</h1>
+        
+        <!-- 设备状态展示区域 -->
+        <div class="status-box">
+            <h3>设备实时状态</h3>
+            <p class="status-item">同学A（外卖柜）：<span id="statusA" class="status-normal">加载中...</span></p>
+            <p class="status-item">同学B（应急响应）：<span id="statusB" class="status-normal">加载中...</span></p>
+            <p class="status-item">同学C（路政照明）：<span id="statusC" class="status-normal">加载中...</span></p>
+            <p class="status-item">全局应急状态：<span id="statusEmergency" class="status-normal">正常</span></p>
+        </div>
+
+        <!-- 远程指令控制区域 -->
+        <div class="control-box">
+            <h3>远程指令控制</h3>
+            <div class="control-group">
+                <h4>外卖柜控制（同学A）</h4>
+                <button class="btn btn-blue" onclick="sendCmd('A','UNLOCK')">开锁</button>
+                <button class="btn btn-blue" onclick="sendCmd('A','LOCK')">关锁</button>
+            </div>
+            <div class="control-group">
+                <h4>路政灯控制（同学C）</h4>
+                <button class="btn btn-blue" onclick="sendCmd('C','LIGHT_ON')">开灯</button>
+                <button class="btn btn-blue" onclick="sendCmd('C','LIGHT_OFF')">关灯</button>
+            </div>
+            <div class="control-group">
+                <h4>全局应急控制</h4>
+                <button class="btn btn-red" onclick="sendCmd('ALL','EMERGENCY_FIRE')">触发火警</button>
+                <button class="btn btn-green" onclick="sendCmd('ALL','EMERGENCY_STOP')">解除应急</button>
+            </div>
+        </div>
+
+        <!-- 历史日志区域 -->
+        <div class="log-box">
+            <h3>最近操作日志</h3>
+            <div id="logContainer">日志加载中...</div>
+        </div>
+    </div>
+
+    <script>
+        // 定时刷新设备状态
+        function updateStatus() {
+            fetch('/api/status')
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('statusA').textContent = data.A;
+                    document.getElementById('statusB').textContent = data.B;
+                    document.getElementById('statusC').textContent = data.C;
+                    // 应急状态样式切换
+                    const emergencyEl = document.getElementById('statusEmergency');
+                    if (data.emergency) {
+                        emergencyEl.textContent = '火警应急';
+                        emergencyEl.className = 'status-warning';
+                    } else {
+                        emergencyEl.textContent = '正常';
+                        emergencyEl.className = 'status-normal';
+                    }
+                });
+        }
+
+        // 下发控制指令
+        function sendCmd(target, cmd) {
+            console.log(target, cmd);
+            fetch('/api/send_cmd', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({target: target, cmd: cmd})
+            }).then(() => {
+                updateStatus();
+                updateLogs();
+            });
+        }
+
+        // 更新日志
+        function updateLogs() {
+            fetch('/api/logs')
+                .then(response => response.json())
+                .then(logs => {
+                    const logHtml = logs.map(item => `<p class="log-item">[${item.time}] ${item.topic} → ${item.data}</p>`).join('');
+                    document.getElementById('logContainer').innerHTML = logHtml;
+                });
+        }
+
+        // 每2秒刷新一次
+        setInterval(() => {
+            updateStatus();
+            updateLogs();
+        }, 5000);
+
+        // 页面初始化加载
+        window.onload = () => {
+            updateStatus();
+            updateLogs();
+        };
+    </script>
+</body>
+</html>
